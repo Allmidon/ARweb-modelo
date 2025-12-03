@@ -1,8 +1,5 @@
-/* script_catarina.js */
-
 /* =========================================
    COMPONENTES DE INTERACCIÓN (GESTOS)
-   (Igual que el anterior, para mover/escalar)
    ========================================= */
 AFRAME.registerComponent("gesture-detector", {
     schema: { element: { default: "" } },
@@ -72,7 +69,13 @@ AFRAME.registerComponent("gesture-detector", {
 });
 
 AFRAME.registerComponent("gesture-handler", {
-    schema: { enabled: { default: true }, rotationFactor: { default: 5 }, minScale: { default: 0.005 }, maxScale: { default: 0.2 } },
+    // AQUÍ ESTÁN LOS CAMBIOS EN MINSCALE Y MAXSCALE
+    schema: { 
+        enabled: { default: true }, 
+        rotationFactor: { default: 5 }, 
+        minScale: { default: 0.01 }, // Mínimo un poco más grande
+        maxScale: { default: 3.0 }   // Máximo mucho más grande (antes era 0.2)
+    },
     init: function() {
         this.handleScale = this.handleScale.bind(this);
         this.handleRotation = this.handleRotation.bind(this);
@@ -105,31 +108,40 @@ AFRAME.registerComponent("gesture-handler", {
             const scaleChange = event.detail.spreadChange;
             let scaleMultiplier = 1;
             if (scaleChange > 0) { scaleMultiplier = 1.05; } else if (scaleChange < 0) { scaleMultiplier = 0.95; }
-            let currentScaleX = this.el.object3D.scale.x; let currentScaleY = this.el.object3D.scale.y; let currentScaleZ = this.el.object3D.scale.z;
-            let newScaleX = currentScaleX * scaleMultiplier; let newScaleY = currentScaleY * scaleMultiplier; let newScaleZ = currentScaleZ * scaleMultiplier;
+            
+            let currentScaleX = this.el.object3D.scale.x; 
+            let currentScaleY = this.el.object3D.scale.y; 
+            let currentScaleZ = this.el.object3D.scale.z;
+            
+            let newScaleX = currentScaleX * scaleMultiplier; 
+            let newScaleY = currentScaleY * scaleMultiplier; 
+            let newScaleZ = currentScaleZ * scaleMultiplier;
+            
+            // Aplica los límites definidos en el schema
             newScaleX = Math.min(Math.max(newScaleX, this.data.minScale), this.data.maxScale);
             newScaleY = Math.min(Math.max(newScaleY, this.data.minScale), this.data.maxScale);
             newScaleZ = Math.min(Math.max(newScaleZ, this.data.minScale), this.data.maxScale);
+            
             this.el.object3D.scale.set(newScaleX, newScaleY, newScaleZ);
         }
     }
 });
 
 /* =========================================
-   NUEVO: COMPONENTE PARA CAPTURA DE PANTALLA
+   COMPONENTE PARA CAPTURA DE PANTALLA
    ========================================= */
 AFRAME.registerComponent("screenshot-handler", {
     init: function() {
-        // Encontrar el botón en el HTML
         const button = document.getElementById('snap-button');
-        // Cuando se haga click, ejecutar la función takeScreenshot
-        button.addEventListener('click', this.takeScreenshot.bind(this));
+        if (button) {
+            button.addEventListener('click', this.takeScreenshot.bind(this));
+        }
     },
 
     takeScreenshot: function() {
         const scene = this.el.sceneEl;
-        const video = document.querySelector('video'); // El video de la cámara de AR.js
-        const canvas = scene.canvas; // El canvas 3D de A-Frame
+        const video = document.querySelector('video');
+        const canvas = scene.canvas;
 
         if (!video || !canvas) {
             console.error("No se encontró el video o el canvas para la captura.");
@@ -137,50 +149,39 @@ AFRAME.registerComponent("screenshot-handler", {
         }
 
         try {
-            // 1. Crear un nuevo canvas temporal para mezclar todo
             const mergedCanvas = document.createElement('canvas');
             mergedCanvas.width = canvas.width;
             mergedCanvas.height = canvas.height;
             const ctx = mergedCanvas.getContext('2d');
 
-            // 2. Dibujar el video de fondo (ajustando la relación de aspecto para que no se deforme)
-            // AR.js a veces estira el video internamente, esto intenta corregirlo visualmente en la foto.
             const videoAspect = video.videoWidth / video.videoHeight;
             const canvasAspect = canvas.width / canvas.height;
             let drawWidth, drawHeight, startX, startY;
 
             if (canvasAspect > videoAspect) {
-                // El canvas es más ancho que el video
                 drawWidth = canvas.width;
                 drawHeight = canvas.width / videoAspect;
                 startX = 0;
                 startY = (canvas.height - drawHeight) / 2;
             } else {
-                // El canvas es más alto que el video
                 drawWidth = canvas.height * videoAspect;
                 drawHeight = canvas.height;
                 startX = (canvas.width - drawWidth) / 2;
                 startY = 0;
             }
             
-            // Dibujar video centrado
             ctx.drawImage(video, startX, startY, drawWidth, drawHeight);
-
-            // 3. Dibujar el modelo 3D encima
             ctx.drawImage(canvas, 0, 0);
 
-            // 4. Crear el enlace de descarga
             const link = document.createElement('a');
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
             link.download = `captura-ar-${timestamp}.png`;
-            link.href = mergedCanvas.toDataURL('image/png'); // Convertir a imagen PNG
+            link.href = mergedCanvas.toDataURL('image/png');
 
-            // 5. Forzar la descarga (puede pedir permiso en el celular)
             document.body.appendChild(link);
             link.click();
-            document.body.appendChild(link); // Limpieza
+            document.body.appendChild(link);
             
-            // Feedback visual opcional en el botón
             const button = document.getElementById('snap-button');
             const originalText = button.innerHTML;
             button.innerHTML = "¡Listo!";
@@ -188,7 +189,7 @@ AFRAME.registerComponent("screenshot-handler", {
 
         } catch (e) {
             console.error("Error al tomar la captura:", e);
-            alert("Hubo un problema al generar la imagen. Asegúrate de que el navegador tenga permisos.");
+            alert("Hubo un problema al generar la imagen.");
         }
     }
 });
